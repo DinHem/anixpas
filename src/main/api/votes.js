@@ -47,6 +47,7 @@ function toVoted(raw) {
     episodesReleased: Number(raw.episodes_released) || 0,
     releaseDate: String(raw.release_date || ''),
     listStatus: Number.isInteger(raw.profile_list_status) ? raw.profile_list_status : null,
+    isFavorite: Boolean(raw.is_favorite),
     /** Своя оценка 1..5. */
     myVote: Number(raw.my_vote) || 0,
   };

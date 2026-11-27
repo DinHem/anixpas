@@ -53,6 +53,8 @@ async function getList(status, page = 0, sort = 0) {
       season: Number(raw.season) || 0,
       releaseDate: String(raw.release_date || ''),
       category: raw.category && raw.category.name ? String(raw.category.name) : '',
+      listStatus: Number.isInteger(raw.profile_list_status) ? raw.profile_list_status : null,
+      isFavorite: Boolean(raw.is_favorite),
     })),
     total: Number(json.total_count) || 0,
   };
@@ -101,6 +103,7 @@ async function getFavorites(page = 0) {
       releaseDate: String(raw.release_date || ''),
       category: raw.category && raw.category.name ? String(raw.category.name) : '',
       listStatus: Number.isInteger(raw.profile_list_status) ? raw.profile_list_status : null,
+      isFavorite: Boolean(raw.is_favorite),
     })),
     total: Number(json.total_count) || 0,
   };

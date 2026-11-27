@@ -218,7 +218,8 @@
         releaseId={releaseId}
         autoPlay={autoPlay}
         onBack={() => {
-          view = previousView === 'catalog' ? 'catalog' : 'release';
+          // «К описанию» всегда ведёт в карточку тайтла, а не в список.
+          view = 'release';
           restoreScroll();
         }}
       />
