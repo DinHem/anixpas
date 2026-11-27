@@ -21,6 +21,9 @@
   let autoPlay = $state(false);
   /** Откуда пришли в карточку — чтобы «назад» вернул туда же. */
   let previousView = $state('catalog');
+  /** История открытых карточек: «назад» возвращает к предыдущему тайтлу. */
+  /** @type {number[]} */
+  let releaseStack = $state([]);
 
   /** Сохранённые позиции прокрутки для экранов, которые остаются в памяти. */
   let catalogScroll = 0;
@@ -70,13 +73,30 @@
   /** @param {number} id */
   async function openRelease(id) {
     rememberScroll(mainEl);
-    previousView = view === 'release' ? previousView : view;
+
+    if (view === 'release') {
+      // Переход по связанному тайтлу: запоминаем, откуда ушли.
+      if (releaseId && releaseId !== id) releaseStack = [...releaseStack, releaseId];
+    } else {
+      // Вход в карточку из списка — стек начинается заново.
+      previousView = view;
+      releaseStack = [];
+    }
+
     releaseId = id;
     view = 'release';
     await restoreScroll();
   }
 
   async function goBack() {
+    // Сначала возвращаемся по цепочке карточек, как в браузере.
+    if (view === 'release' && releaseStack.length) {
+      releaseId = releaseStack[releaseStack.length - 1];
+      releaseStack = releaseStack.slice(0, -1);
+      await restoreScroll();
+      return;
+    }
+
     // В карточке прокрутка своя — возвращаемся к сохранённой позиции списка.
     view = previousView;
     if (view === 'catalog') catalogRefresh += 1;
@@ -116,15 +136,47 @@
     setTimeout(() => checkForUpdates(true), 3000);
     const timer = setInterval(() => checkForUpdates(true), 6 * 60 * 60 * 1000);
 
+    /**
+     * Esc = «назад» там, где есть кнопка «назад».
+     * Если сверху открыта модалка — не мешаем ей.
+     */
+    const onEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      if (event.defaultPrevented) return;
+      if (showAuth) return;
+
+      const modal = document.querySelector(
+        '.modal-backdrop, .list-menu, .video-modal-backdrop, .update-modal-backdrop'
+      );
+      if (modal) return;
+
+      if (view === 'release') {
+        event.preventDefault();
+        goBack();
+      } else if (view === 'watch') {
+        event.preventDefault();
+        view = 'release';
+        restoreScroll();
+      } else if (view === 'votes') {
+        event.preventDefault();
+        navigate('profile');
+      } else if (view === 'status') {
+        event.preventDefault();
+        navigate('catalog');
+      }
+    };
+
     // Отладка: location.hash = 'auth' открывает экран входа.
     const onHash = () => {
       if (location.hash === '#auth') showAuth = true;
     };
     window.addEventListener('hashchange', onHash);
+    window.addEventListener('keydown', onEscape);
 
     return () => {
       clearInterval(timer);
       window.removeEventListener('hashchange', onHash);
+      window.removeEventListener('keydown', onEscape);
     };
   });
   /** @param {any} profile */
