@@ -1,7 +1,7 @@
 {
   "name": "anixpas",
   "productName": "AnixPas",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Свой десктоп-клиент Anixart",
   "private": true,
   "main": "src/main/main.js",
