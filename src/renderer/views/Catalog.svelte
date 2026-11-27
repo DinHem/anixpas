@@ -85,25 +85,41 @@
     return { sort: 0, ...tabDef.filter, country: countryDef.country };
   }
 
+  /**
+   * Идущая загрузка. Нужна, чтобы параллельные вызовы (прокрутка + монтирование)
+   * ждали одну и ту же страницу, а не выходили сразу с пустым списком.
+   * @type {Promise<void>|null}
+   */
+  let pendingLoad = null;
+
   async function load(force = false) {
-    if (loading || exhausted) return;
+    if (pendingLoad) return pendingLoad;
+    if (exhausted) return;
+
     loading = true;
     error = '';
 
-    try {
-      // Страницы могут целиком состоять из дублей — collectFresh шагает дальше.
-      const result = await collectFresh({
-        page,
-        knownIds: new Set(items.map((i) => i.id)),
-        fetchPage: (p) => bridge.catalog(p, currentFilter(), force && p === page),
-      });
+    pendingLoad = (async () => {
+      try {
+        // Страницы могут целиком состоять из дублей — collectFresh шагает дальше.
+        const result = await collectFresh({
+          page,
+          knownIds: new Set(items.map((i) => i.id)),
+          fetchPage: (p) => bridge.catalog(p, currentFilter(), force && p === page),
+        });
 
-      if (result.fresh.length > 0) items = [...items, ...result.fresh];
-      page = result.page;
-      exhausted = result.exhausted;
-    } catch (err) {
-      error = err && err.message ? err.message : String(err);
+        if (result.fresh.length > 0) items = [...items, ...result.fresh];
+        page = result.page;
+        exhausted = result.exhausted;
+      } catch (err) {
+        error = err && err.message ? err.message : String(err);
+      }
+    })();
+
+    try {
+      await pendingLoad;
     } finally {
+      pendingLoad = null;
       loading = false;
     }
 
