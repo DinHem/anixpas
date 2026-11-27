@@ -171,3 +171,14 @@ export function formatEpisodesShort(released, total) {
   if (!t && r) return `${r} из ? эп`;
   return `${t || r} эп`;
 }
+
+/**
+ * Возрастной рейтинг Anixart: в API это код, а не число лет.
+ * Проверено по официальному приложению: 2 = 6+, 3 = 12+, 4 = 16+, 5 = 18+.
+ * @param {number} code
+ * @returns {string}
+ */
+export function formatAgeRating(code) {
+  const map = { 2: '6+', 3: '12+', 4: '16+', 5: '18+' };
+  return map[Number(code)] || '';
+}

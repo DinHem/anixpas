@@ -11,7 +11,7 @@
   import VideoModal from '../components/VideoModal.svelte';
   import Icon from '../components/Icon.svelte';
   import { listLabel, listClass } from '../lib/lists.js';
-  import { formatGrade, formatCount, formatDuration, formatBytes, plural } from '../lib/format.js';
+  import { formatGrade, formatCount, formatDuration, formatBytes, plural, formatAgeRating } from '../lib/format.js';
 
   /** @type {{ id: number, onBack: () => void, onWatch: (id: number) => void, onOpen: (id: number) => void }} */
   let { id, onBack, onWatch, onOpen, onListChange = null } = $props();
@@ -321,8 +321,8 @@
         {#if release.releaseDate}
           <div class="row-info"><span class="meta">Выход</span><span>{release.releaseDate}</span></div>
         {/if}
-        {#if release.ageRating}
-          <div class="row-info"><span class="meta">Возраст</span><span>{release.ageRating}+</span></div>
+        {#if formatAgeRating(release.ageRating)}
+          <div class="row-info"><span class="meta">Возраст</span><span>{formatAgeRating(release.ageRating)}</span></div>
         {/if}
       </div>
 
