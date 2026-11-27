@@ -21,6 +21,11 @@ const { app } = require('electron');
 const MIN_PROGRESS_SECONDS = 15;
 /** Доля длительности, после которой серия считается досмотренной. */
 const COMPLETED_RATIO = 0.95;
+/**
+ * Сколько секунд нужно посмотреть, чтобы тайтл попал в «Продолжить просмотр».
+ * Открыл серию и сразу закрыл — это ещё не просмотр.
+ */
+const CONTINUE_MIN_SECONDS = 60;
 /** Как часто сбрасывать накопленное на диск, мс. */
 const FLUSH_DELAY = 4000;
 /** Максимум релизов в истории. */
@@ -209,7 +214,22 @@ async function getRelease(releaseId) {
 }
 
 /**
+ * Сколько секунд смотрели последнюю открытую серию релиза.
+ * @param {any} entry
+ */
+function lastWatchedSeconds(entry) {
+  if (!entry || !entry.lastPosition || !entry.episodes) return 0;
+
+  const key = episodeKey(entry.lastDubberId, entry.lastSourceId, entry.lastPosition);
+  const episode = entry.episodes[key];
+  return episode && Number.isFinite(episode.time) ? episode.time : 0;
+}
+
+/**
  * Последний просмотренный релиз (для плашки «Продолжить просмотр»).
+ *
+ * Берём самый свежий по времени, но только если последнюю серию реально смотрели
+ * не меньше минуты (или досмотрели до конца) — случайные открытия не в счёт.
  * @returns {Promise<any|null>}
  */
 async function getLast() {
@@ -218,11 +238,22 @@ async function getLast() {
   if (!entries.length) return null;
 
   entries.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  const last = entries[0];
 
-  // Если у последнего нет ни одной открытой серии — плашку не показываем.
-  if (!last || !last.lastPosition) return null;
-  return last;
+  for (const entry of entries) {
+    if (!entry || !entry.lastPosition) continue;
+
+    const seconds = lastWatchedSeconds(entry);
+    const key = episodeKey(entry.lastDubberId, entry.lastSourceId, entry.lastPosition);
+    const episode = entry.episodes ? entry.episodes[key] : null;
+    const completed = Boolean(episode && episode.completed);
+
+    if (seconds >= CONTINUE_MIN_SECONDS || completed) {
+      // Время отдаём наружу для подписи «1 серия · 4:12», в файл не пишем.
+      return { ...entry, lastTime: seconds };
+    }
+  }
+
+  return null;
 }
 
 /**

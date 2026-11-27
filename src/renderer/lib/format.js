@@ -182,3 +182,20 @@ export function formatAgeRating(code) {
   const map = { 2: '6+', 3: '12+', 4: '16+', 5: '18+' };
   return map[Number(code)] || '';
 }
+
+/**
+ * Секунды → «4:12» или «1:04:12» для подписи продолжаемого просмотра.
+ * @param {number} seconds
+ * @returns {string}
+ */
+export function formatClock(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (!total) return '';
+
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+
+  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}

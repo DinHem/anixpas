@@ -8,7 +8,7 @@
    */
   import { onMount } from 'svelte';
   import { bridge } from '../lib/bridge.js';
-  import { formatGrade, formatPremiere, formatSnippet, formatEpisodesShort } from '../lib/format.js';
+  import { formatGrade, formatPremiere, formatSnippet, formatEpisodesShort, formatClock } from '../lib/format.js';
   import ReleaseMenu from '../components/ReleaseMenu.svelte';
   import Icon from '../components/Icon.svelte';
   import VirtualGrid from '../components/VirtualGrid.svelte';
@@ -349,7 +349,12 @@
         <div class="continue-body">
           <div class="continue-label">Продолжить просмотр</div>
           <div class="continue-title">{lastWatched.title || 'Без названия'}</div>
-          <div class="continue-meta">{lastWatched.lastPosition} серия</div>
+          <div class="continue-meta">
+            {lastWatched.lastPosition} серия
+            {#if lastWatched.lastTime}
+              · {formatClock(lastWatched.lastTime)}
+            {/if}
+          </div>
         </div>
         <div class="continue-play"><Icon name="play" size={18} /></div>
       </button>
