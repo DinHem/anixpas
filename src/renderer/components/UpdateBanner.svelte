@@ -106,6 +106,6 @@
   </div>
 {/if}
 
-{#if state.showNotes && state.available}
+{#if state.showNotes}
   <UpdateModal />
 {/if}

@@ -130,6 +130,10 @@
   <button class="primary" onclick={() => checkForUpdates()} disabled={upd.checking}>
     {upd.checking ? 'Проверяю…' : 'Проверить обновления'}
   </button>
+
+  <button class="update-ghost" onclick={() => setShowNotes(true)}>
+    История изменений
+  </button>
 </section>
 
 <section>

@@ -52,12 +52,26 @@ let downloading = null;
  * @param {string} a @param {string} b
  */
 function compareVersions(a, b) {
-  /** @param {string} value */
+  /**
+   * Поддерживаем три вида: 1.2.3, 1.2.3-beta (до релиза) и 1.2.4a (после релиза).
+   * Буквенный суффикс без дефиса считается шагом вперёд: 0.2.4a > 0.2.4.
+   * @param {string} value
+   */
   const parse = (value) => {
-    const [core, pre = ''] = String(value).split('-');
-    const nums = core.split('.').map((n) => Number(n) || 0);
-    while (nums.length < 3) nums.push(0);
-    return { nums, pre };
+    const [core, pre = ''] = String(value).trim().split('-');
+    const match = /^(\d+)\.(\d+)\.(\d+)([a-z]*)$/i.exec(core);
+
+    if (!match) {
+      const nums = core.split('.').map((n) => Number.parseInt(n, 10) || 0);
+      while (nums.length < 3) nums.push(0);
+      return { nums, pre, step: '' };
+    }
+
+    return {
+      nums: [Number(match[1]), Number(match[2]), Number(match[3])],
+      pre,
+      step: String(match[4] || '').toLowerCase(),
+    };
   };
 
   const left = parse(a);
@@ -67,11 +81,18 @@ function compareVersions(a, b) {
     if (left.nums[i] !== right.nums[i]) return left.nums[i] > right.nums[i] ? 1 : -1;
   }
 
-  // Релиз новее своей же беты: 1.0.0 > 1.0.0-beta.
-  if (left.pre === right.pre) return 0;
-  if (!left.pre) return 1;
-  if (!right.pre) return -1;
-  return left.pre > right.pre ? 1 : -1;
+  // 1.0.0-beta < 1.0.0 — предрелиз идёт до финальной версии.
+  if (left.pre !== right.pre) {
+    if (!left.pre) return 1;
+    if (!right.pre) return -1;
+    return left.pre > right.pre ? 1 : -1;
+  }
+
+  // 0.2.4 < 0.2.4a < 0.2.4b — буквенный шаг идёт после релиза.
+  if (left.step === right.step) return 0;
+  if (!left.step) return -1;
+  if (!right.step) return 1;
+  return left.step > right.step ? 1 : -1;
 }
 
 /**
@@ -340,4 +361,52 @@ function install(file) {
   return { ok: true, started: true };
 }
 
-module.exports = { check, download, install, takeDownloaded, compareVersions };
+/** История релизов: кэш на час, чтобы не тратить лимит GitHub (60 запросов/час). */
+let historyCache = { at: 0, items: [] };
+const HISTORY_TTL = 60 * 60 * 1000;
+const HISTORY_URL = 'https://api.github.com/repos/DinHem/anixpas-releases/releases?per_page=20';
+
+/**
+ * Список прошлых версий с заметками — прямо из релизов на GitHub.
+ * @returns {Promise<{ok: boolean, error?: string, items?: Array<{version: string, name: string, notes: string, publishedAt: string}>}>}
+ */
+async function changelog() {
+  const now = Date.now();
+  if (historyCache.items.length && now - historyCache.at < HISTORY_TTL) {
+    return { ok: true, items: historyCache.items };
+  }
+
+  try {
+    const response = await fetch(HISTORY_URL, {
+      signal: AbortSignal.timeout(MANIFEST_TIMEOUT),
+      headers: {
+        'User-Agent': `AnixPas/${app.getVersion()}`,
+        Accept: 'application/vnd.github+json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('[updater] история: http', response.status);
+      return { ok: false, error: `http_${response.status}`, items: historyCache.items };
+    }
+
+    const list = await response.json();
+    const items = (Array.isArray(list) ? list : [])
+      .filter((release) => release && !release.draft)
+      .map((release) => ({
+        version: String(release.tag_name || '').replace(/^v/, ''),
+        name: String(release.name || release.tag_name || ''),
+        notes: String(release.body || ''),
+        publishedAt: String(release.published_at || ''),
+      }))
+      .filter((release) => release.version);
+
+    historyCache = { at: now, items };
+    return { ok: true, items };
+  } catch (err) {
+    console.error('[updater] история недоступна:', err && err.message);
+    return { ok: false, error: 'offline', items: historyCache.items };
+  }
+}
+
+module.exports = { check, download, install, takeDownloaded, compareVersions, changelog };

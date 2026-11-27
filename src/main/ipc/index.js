@@ -568,6 +568,11 @@ function registerIpc() {
     );
   });
 
+  register(CHANNELS.UPDATER_CHANGELOG, async (payload) => {
+    if (!validators.isNoArgs(payload)) return fail('invalid_args');
+    return ok(await updater.changelog());
+  });
+
   register(CHANNELS.UPDATER_CHECK, async (payload) => {
     if (!validators.isNoArgs(payload)) return fail('invalid_args');
     return ok(await updater.check());

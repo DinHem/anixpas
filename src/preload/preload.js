@@ -60,6 +60,7 @@ const ALLOWED_CHANNELS = new Set([
   'updater:check',
   'updater:download',
   'updater:install',
+  'updater:changelog',
 ]);
 
 /**
@@ -168,6 +169,7 @@ contextBridge.exposeInMainWorld('anixpas', {
     check: () => invoke('updater:check'),
     download: (payload) => invoke('updater:download', payload),
     install: (file) => invoke('updater:install', { file }),
+    changelog: () => invoke('updater:changelog'),
 
     /** Прогресс скачивания обновления. @param {(value: {percent: number, received: number, total: number}) => void} callback */
     onProgress: (callback) => {

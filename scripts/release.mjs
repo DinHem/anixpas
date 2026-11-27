@@ -79,11 +79,20 @@ if (capture(`git tag --list ${tag}`)) {
 console.log(`\n=== Сборка ${version} ===\n`);
 run('npm run make:nsis');
 
-const setupSource = path.join(SETUP_DIR, `AnixPas-Setup-${version}.exe`);
-if (!fs.existsSync(setupSource)) {
-  console.error(`Не найден установщик: ${setupSource}`);
+// electron-builder может переименовать артефакт: 0.2.4a → AnixPas-Setup-0.2.4-a.exe.
+// Берём самый свежий установщик из папки и переименовываем сами.
+const candidates = fs
+  .readdirSync(SETUP_DIR)
+  .filter((name) => name.startsWith('AnixPas-Setup-') && name.endsWith('.exe') && !name.includes('__uninstaller'))
+  .map((name) => ({ name, at: fs.statSync(path.join(SETUP_DIR, name)).mtimeMs }))
+  .sort((a, b) => b.at - a.at);
+
+if (candidates.length === 0) {
+  console.error(`Не найден установщик в ${SETUP_DIR}`);
   process.exit(1);
 }
+
+const setupSource = path.join(SETUP_DIR, candidates[0].name);
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 const setupName = `AnixPas-Setup-${version}.exe`;

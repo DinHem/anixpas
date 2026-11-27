@@ -159,6 +159,9 @@ export const bridge = {
     /** @param {string} file */
     install: (file) => unwrap(api.updater.install(file)),
 
+    /** История релизов с GitHub (кэш в main на час). */
+    changelog: () => unwrap(api.updater.changelog()),
+
     /** @param {(value: {percent: number, received: number, total: number}) => void} callback */
     onProgress: (callback) => api.updater.onProgress(callback),
   },

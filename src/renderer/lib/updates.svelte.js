@@ -34,6 +34,11 @@ const state = $state({
   message: '',
   /** Открыта модалка «Что нового». */
   showNotes: false,
+  /** История всех релизов с GitHub. */
+  /** @type {Array<{version: string, name: string, notes: string, publishedAt: string}>} */
+  history: [],
+  historyLoading: false,
+  historyError: '',
 });
 
 /** @returns {typeof state} */
@@ -164,4 +169,23 @@ export function showUpdate() {
 /** @param {boolean} value */
 export function setShowNotes(value) {
   state.showNotes = Boolean(value);
+  if (value) loadHistory();
+}
+
+/** История всех версий: грузим один раз за сессию. */
+export async function loadHistory() {
+  if (state.historyLoading || state.history.length) return;
+
+  state.historyLoading = true;
+  state.historyError = '';
+
+  try {
+    const result = await bridge.updater.changelog();
+    if (result && Array.isArray(result.items)) state.history = result.items;
+    if (!result || result.ok !== true) state.historyError = (result && result.error) || 'offline';
+  } catch {
+    state.historyError = 'offline';
+  } finally {
+    state.historyLoading = false;
+  }
 }

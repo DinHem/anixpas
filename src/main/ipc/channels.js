@@ -56,6 +56,7 @@ const CHANNELS = {
   UPDATER_CHECK: 'updater:check',
   UPDATER_DOWNLOAD: 'updater:download',
   UPDATER_INSTALL: 'updater:install',
+  UPDATER_CHANGELOG: 'updater:changelog',
 };
 
 /**

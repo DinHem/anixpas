@@ -3856,3 +3856,61 @@ button.primary:hover:not(:disabled) {
   line-height: 1.5;
   color: var(--muted-2);
 }
+
+/* История версий в модалке «Что нового» */
+.update-modal-history-title {
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+
+.update-release {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  margin-bottom: var(--s-2);
+}
+
+.update-release > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-md);
+}
+
+.update-release > summary::-webkit-details-marker {
+  display: none;
+}
+
+.update-release > summary::before {
+  content: '▸';
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform var(--t-fast);
+}
+
+.update-release[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.update-release-version {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.update-release-date {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.update-release-body {
+  padding: 0 var(--s-4) var(--s-3);
+}
+
+.update-release-body .update-modal-section {
+  margin-top: var(--s-3);
+}
