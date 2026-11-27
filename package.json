@@ -15,7 +15,8 @@
     "smoke:ui": "npm run build:renderer && electron . --smoke=ui",
     "smoke:api": "electron . --smoke=api",
     "release": "node scripts/release.mjs",
-    "make:nsis": "npm run build:renderer && electron-forge package && electron-builder --win nsis --prepackaged out/AnixPas-win32-x64"
+    "make:nsis": "npm run build:renderer && electron-forge package && electron-builder --win nsis --prepackaged out/AnixPas-win32-x64",
+    "old": "node scripts/old-version.mjs"
   },
   "author": "DinHem",
   "license": "MIT",

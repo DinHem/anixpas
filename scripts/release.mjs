@@ -62,6 +62,14 @@ if (dirty) {
   process.exit(1);
 }
 
+// Релиз выпускается только с master: в нём лежит ровно то, что видят люди.
+const branch = capture('git rev-parse --abbrev-ref HEAD');
+if (branch !== 'master') {
+  console.error(`Релиз делается с ветки master, а сейчас активна ${branch}.`);
+  console.error('Сначала: git checkout master && git merge dev && git push');
+  process.exit(1);
+}
+
 const tag = `v${version}`;
 if (capture(`git tag --list ${tag}`)) {
   console.error(`Тег ${tag} уже существует — поднимите версию в package.json.`);
