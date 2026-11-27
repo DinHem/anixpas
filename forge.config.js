@@ -8,14 +8,15 @@ const { AutoUnpackNativesPlugin } = require('@electron-forge/plugin-auto-unpack-
  * Обновления: свой апдейтер, см. docs/03-security.md §10.1
  */
 module.exports = {
+  // Каталог сборки можно переопределить: ANIXPAS_OUT_DIR=out2 npm run make:nsis
+  ...(process.env.ANIXPAS_OUT_DIR ? { outDir: process.env.ANIXPAS_OUT_DIR } : {}),
+
   packagerConfig: {
     name: 'AnixPas',
     executableName: 'anixpas',
     appBundleId: 'app.anixpas',
     asar: true,
     icon: 'assets/icon',
-    // Каталог сборки можно переопределить: ANIXPAS_OUT_DIR=out2
-    ...(process.env.ANIXPAS_OUT_DIR ? { out: process.env.ANIXPAS_OUT_DIR } : {}),
     // В сборку не попадает ничего лишнего.
     // node_modules не нужен вовсе: main использует только встроенные модули Node и electron,
     // а hls.js уже вкомпилирован в бандл рендерера.

@@ -19,3 +19,6 @@ release-artifacts/
 
 # Внутренние заметки — отдельный приватный репозиторий anixpas-notes
 docs/
+
+# Сборки с переопределённым каталогом (ANIXPAS_OUT_DIR)
+/out*/
