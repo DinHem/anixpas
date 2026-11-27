@@ -1,0 +1,21 @@
+node_modules/
+build/
+out/
+dist/
+.env
+.env.*
+*.log
+
+# Приватный ключ подписи обновлений — НИКОГДА в репозиторий
+*.pem
+*.key
+update-key*
+
+# Ключи подписи обновлений
+.keys/
+
+# Артефакты релиза (собираются скриптом, живут в anixpas-releases)
+release-artifacts/
+
+# Внутренние заметки — отдельный приватный репозиторий anixpas-notes
+docs/

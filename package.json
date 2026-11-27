@@ -1,0 +1,87 @@
+{
+  "name": "anixpas",
+  "productName": "AnixPas",
+  "version": "0.2.2",
+  "description": "Свой десктоп-клиент Anixart",
+  "private": true,
+  "main": "src/main/main.js",
+  "scripts": {
+    "build:renderer": "rollup -c",
+    "start": "npm run build:renderer && electron-forge start",
+    "package": "npm run build:renderer && electron-forge package",
+    "make": "npm run make:nsis",
+    "lint": "eslint src --max-warnings 0",
+    "audit": "npm audit --omit=dev",
+    "smoke:ui": "npm run build:renderer && electron . --smoke=ui",
+    "smoke:api": "electron . --smoke=api",
+    "release": "node scripts/release.mjs",
+    "make:nsis": "npm run build:renderer && electron-forge package && electron-builder --win nsis --prepackaged out/AnixPas-win32-x64"
+  },
+  "author": "DinHem",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron-forge/cli": "^8.0.1",
+    "@electron-forge/maker-squirrel": "^8.0.1",
+    "@electron-forge/maker-zip": "^8.0.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^8.0.1",
+    "@rollup/plugin-commonjs": "^28.0.1",
+    "@rollup/plugin-node-resolve": "^15.3.1",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "eslint": "^9.17.0",
+    "rollup": "^4.28.1",
+    "rollup-plugin-svelte": "^7.2.2",
+    "svelte": "^5.16.0"
+  },
+  "dependencies": {
+    "hls.js": "^1.5.17"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DinHem/anixpas.git"
+  },
+  "homepage": "https://github.com/DinHem/anixpas",
+  "bugs": {
+    "url": "https://github.com/DinHem/anixpas/issues"
+  },
+  "build": {
+    "appId": "app.anixpas",
+    "productName": "AnixPas",
+    "copyright": "Copyright © 2026 DinHem",
+    "directories": {
+      "output": "out/nsis",
+      "buildResources": "assets"
+    },
+    "files": [],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "AnixPas",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "installerLanguages": [
+        "ru_RU"
+      ],
+      "language": "1049",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "artifactName": "AnixPas-Setup-${version}.exe"
+    },
+    "compression": "maximum"
+  }
+}
