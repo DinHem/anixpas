@@ -22,7 +22,8 @@ import { releaseNotes, plainNotes } from './release-notes.mjs';
 const REPO_SOURCES = 'DinHem/anixpas';
 const REPO_RELEASES = 'DinHem/anixpas-releases';
 const KEY_PATH = path.join('.keys', 'update-key.pem');
-const SETUP_DIR = path.join('out', 'nsis');
+const OUT_ROOT = process.env.ANIXPAS_OUT_DIR || 'out';
+const SETUP_DIR = path.join(OUT_ROOT, 'nsis');
 const OUT_DIR = 'release-artifacts';
 
 /** @param {string} command */

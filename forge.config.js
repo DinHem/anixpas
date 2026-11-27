@@ -14,6 +14,8 @@ module.exports = {
     appBundleId: 'app.anixpas',
     asar: true,
     icon: 'assets/icon',
+    // Каталог сборки можно переопределить: ANIXPAS_OUT_DIR=out2
+    ...(process.env.ANIXPAS_OUT_DIR ? { out: process.env.ANIXPAS_OUT_DIR } : {}),
     // В сборку не попадает ничего лишнего.
     // node_modules не нужен вовсе: main использует только встроенные модули Node и electron,
     // а hls.js уже вкомпилирован в бандл рендерера.
