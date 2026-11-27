@@ -73,7 +73,13 @@
       (filters.studio ? 1 : 0) +
       (filters.source ? 1 : 0) +
       (filters.season !== undefined ? 1 : 0) +
-      (filters.episodesFrom !== undefined || filters.episodesTo !== undefined ? 1 : 0)
+      (filters.episodesFrom !== undefined || filters.episodesTo !== undefined ? 1 : 0) +
+      (filters.category_id !== undefined && filters.category_id !== null ? 1 : 0) +
+      (filters.status_id !== undefined && filters.status_id !== null ? 1 : 0) +
+      (filters.country ? 1 : 0) +
+      (filters.ageRatings || []).length +
+      (filters.durationFrom !== undefined || filters.durationTo !== undefined ? 1 : 0) +
+      (filters.startYear !== undefined || filters.endYear !== undefined ? 1 : 0)
   );
 
   async function load(force = false) {

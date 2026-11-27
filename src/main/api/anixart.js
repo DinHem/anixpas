@@ -121,6 +121,16 @@ async function catalog(page, filter = {}) {
   if (Number.isInteger(filter.episodesTo)) body.episodes_to = filter.episodesTo;
   if (Array.isArray(filter.types) && filter.types.length) body.types = filter.types;
 
+  // Проверено: docs/api-scout.md §27.3 — годы, длительность эпизода, возраст, режим жанров.
+  if (Number.isInteger(filter.startYear)) body.start_year = filter.startYear;
+  if (Number.isInteger(filter.endYear)) body.end_year = filter.endYear;
+  if (Number.isInteger(filter.durationFrom)) body.episode_duration_from = filter.durationFrom;
+  if (Number.isInteger(filter.durationTo)) body.episode_duration_to = filter.durationTo;
+  if (Array.isArray(filter.ageRatings) && filter.ageRatings.length) {
+    body.age_ratings = filter.ageRatings;
+  }
+  if (Number.isInteger(filter.genresMode)) body.genres_mode = filter.genresMode;
+
   const json = await call(`/filter/${page}?extended_mode=true`, { method: 'POST', body });
   return { items: json.content || [] };
 }

@@ -3996,3 +3996,124 @@ button.primary:hover:not(:disabled) {
   background: var(--bg);
   box-shadow: 0 1px 0 var(--border);
 }
+
+/* ---------- широкая панель фильтров ---------- */
+
+.filter-panel.wide {
+  width: min(920px, 96vw);
+}
+
+.filter-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.filter-body.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-3) var(--s-4);
+  align-content: start;
+}
+
+.filter-body.grid .field {
+  min-width: 0;
+}
+
+.filter-body.grid .span-2 {
+  grid-column: span 2;
+}
+
+.filter-body.grid .span-all {
+  grid-column: 1 / -1;
+}
+
+.filter-body.grid .field > span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.filter-body.grid select,
+.filter-body.grid input[type='text'],
+.filter-body.grid input[type='number'] {
+  width: 100%;
+  height: 38px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-strong);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+
+.filter-body.grid select:focus,
+.filter-body.grid input:focus {
+  outline: none;
+  border-color: var(--accent-line);
+}
+
+.filter-body.grid .field-row {
+  display: flex;
+  gap: var(--s-2);
+}
+
+.genres-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: 2px;
+}
+
+.genres-head .hint {
+  margin: 0;
+}
+
+/* Возрастные рейтинги — чипсами */
+.filter-body.grid .chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-body.grid .chip {
+  height: 32px;
+  padding-inline: var(--s-3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--panel-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.filter-body.grid .chip:hover {
+  border-color: var(--accent-line);
+}
+
+.filter-body.grid .chip.active {
+  background: var(--accent-weak);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .filter-body.grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Жанры и озвучки в широкой панели — колонками, иначе скроллить полэкрана */
+.filter-body.grid .span-all .checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px var(--s-3);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+}

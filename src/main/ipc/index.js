@@ -109,6 +109,11 @@ function registerIpc() {
     if (!validators.isEpisodes(filter.episodesFrom)) return fail('invalid_args');
     if (!validators.isEpisodes(filter.episodesTo)) return fail('invalid_args');
     if (!validators.areTypes(filter.types)) return fail('invalid_args');
+    if (!validators.isYear(filter.startYear)) return fail('invalid_args');
+    if (!validators.isYear(filter.endYear)) return fail('invalid_args');
+    if (!validators.isDuration(filter.durationFrom)) return fail('invalid_args');
+    if (!validators.isDuration(filter.durationTo)) return fail('invalid_args');
+    if (!validators.areAgeRatings(filter.ageRatings)) return fail('invalid_args');
 
     const items = await service.getCatalog(payload.page, {
       sort: Number.isInteger(filter.sort) ? filter.sort : 0,
@@ -122,6 +127,13 @@ function registerIpc() {
       episodesFrom: Number.isInteger(filter.episodesFrom) ? filter.episodesFrom : undefined,
       episodesTo: Number.isInteger(filter.episodesTo) ? filter.episodesTo : undefined,
       types: Array.isArray(filter.types) && filter.types.length ? filter.types : undefined,
+      startYear: Number.isInteger(filter.startYear) ? filter.startYear : undefined,
+      endYear: Number.isInteger(filter.endYear) ? filter.endYear : undefined,
+      durationFrom: Number.isInteger(filter.durationFrom) ? filter.durationFrom : undefined,
+      durationTo: Number.isInteger(filter.durationTo) ? filter.durationTo : undefined,
+      ageRatings:
+        Array.isArray(filter.ageRatings) && filter.ageRatings.length ? filter.ageRatings : undefined,
+      genresMode: Number.isInteger(filter.genresMode) ? filter.genresMode : undefined,
     }, { force: Boolean(payload.force) });
 
     return ok(items);

@@ -91,6 +91,17 @@ const validators = {
     (Array.isArray(v) && v.length <= 20 && v.every((n) => Number.isInteger(n) && n > 0 && n < 1e6)),
 
   /** Жанры — массив коротких строк, не больше 10. */
+  /** Год выхода релиза. */
+  isYear: (v) => v === undefined || v === null || (Number.isInteger(v) && v >= 1940 && v <= 2100),
+
+  /** Длительность эпизода в минутах. */
+  isDuration: (v) => v === undefined || v === null || (Number.isInteger(v) && v >= 0 && v <= 600),
+
+  /** Возрастные рейтинги — коды 2..5 (6+, 12+, 16+, 18+). */
+  areAgeRatings: (v) =>
+    v === undefined ||
+    (Array.isArray(v) && v.length <= 4 && v.every((n) => Number.isInteger(n) && n >= 1 && n <= 5)),
+
   /** Строки для форм входа: логин, почта, пароль, код. */
   isCredential: (v) => typeof v === 'string' && v.length > 0 && v.length <= 200,
   isEmail: (v) => typeof v === 'string' && v.length >= 3 && v.length <= 200 && v.includes('@'),
