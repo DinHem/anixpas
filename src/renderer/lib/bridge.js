@@ -107,6 +107,15 @@ export const bridge = {
 
     /** @param {{login: string, email: string, password: string, hash: string, code: string}} payload */
     verify: (payload) => unwrap(api.auth.verify(plain(payload))),
+
+    /** @param {string} data логин или почта */
+    restore: (data) => unwrap(api.auth.restore(data)),
+
+    /** @param {{data: string, password: string, hash: string, code: string}} payload */
+    restoreVerify: (payload) => unwrap(api.auth.restoreVerify(plain(payload))),
+
+    /** @param {{data: string, password: string, hash: string}} payload */
+    restoreResend: (payload) => unwrap(api.auth.restoreResend(plain(payload))),
     logout: () => unwrap(api.auth.logout()),
     status: () => unwrap(api.auth.status()),
   },

@@ -503,6 +503,44 @@ function registerIpc() {
     return ok(await cache.size());
   });
 
+  register(CHANNELS.AUTH_RESTORE, async (payload) => {
+    if (!validators.isPlainObject(payload)) return fail('invalid_args');
+    if (!validators.isCredential(payload.data)) return fail('invalid_args');
+    return ok(await auth.restore(payload.data.trim()));
+  });
+
+  register(CHANNELS.AUTH_RESTORE_RESEND, async (payload) => {
+    if (!validators.isPlainObject(payload)) return fail('invalid_args');
+    if (!validators.isCredential(payload.data)) return fail('invalid_args');
+    if (!validators.isCredential(payload.password)) return fail('invalid_args');
+    if (typeof payload.hash !== 'string' || payload.hash.length > 300) return fail('invalid_args');
+
+    return ok(
+      await auth.restoreResend({
+        data: payload.data.trim(),
+        password: payload.password,
+        hash: payload.hash,
+      })
+    );
+  });
+
+  register(CHANNELS.AUTH_RESTORE_VERIFY, async (payload) => {
+    if (!validators.isPlainObject(payload)) return fail('invalid_args');
+    if (!validators.isCredential(payload.data)) return fail('invalid_args');
+    if (!validators.isCredential(payload.password)) return fail('invalid_args');
+    if (typeof payload.hash !== 'string' || payload.hash.length > 300) return fail('invalid_args');
+    if (!validators.isCode(String(payload.code || ''))) return fail('invalid_args');
+
+    return ok(
+      await auth.restoreVerify({
+        data: payload.data.trim(),
+        password: payload.password,
+        hash: payload.hash,
+        code: String(payload.code),
+      })
+    );
+  });
+
   register(CHANNELS.AUTH_SIGNUP, async (payload) => {
     if (!validators.isPlainObject(payload)) return fail('invalid_args');
     if (!validators.isCredential(payload.login)) return fail('invalid_args');

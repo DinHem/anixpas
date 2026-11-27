@@ -11,7 +11,7 @@
   /** @type {{ onClose: () => void, onSuccess: (profile: any) => void }} */
   let { onClose, onSuccess } = $props();
 
-  /** @type {'login'|'signup'|'verify'} */
+  /** @type {'login'|'signup'|'verify'|'restore'|'restoreVerify'} */
   let mode = $state('login');
 
   let login = $state('');
@@ -30,8 +30,11 @@
   let notice = $state('');
   let showPassword = $state(false);
 
-  /** Сайт Anixart: восстановление пароля живёт там, API для него закрыт. */
-  const SITE = 'https://anixart-app.com/';
+  /** Восстановление пароля: данные, hash и новый пароль. */
+  /** @type {{data: string, hash: string, password: string}|null} */
+  let recovery = $state(null);
+  /** Через сколько секунд можно запросить код заново. */
+  let resendIn = $state(0);
 
   /** Понятные тексты вместо кодов. */
   const MESSAGES = {
@@ -41,6 +44,7 @@
     bad_password: 'Пароль слишком короткий — минимум 6 символов',
     login_taken: 'Такой логин уже занят',
     bad_code: 'Код не подошёл — проверьте письмо или запросите новый',
+    not_found: 'Аккаунт с таким логином или почтой не найден',
     network: 'Нет связи с Anixart. Проверьте интернет',
     empty_response: 'Сервер не ответил. Попробуйте позже',
     bad_response: 'Неожиданный ответ сервера',
@@ -189,6 +193,133 @@
     }
   }
 
+  /** Отсчёт до возможности запросить код заново. */
+  function startResendTimer(seconds) {
+    const total = Number(seconds) || 0;
+    if (total <= 0) {
+      resendIn = 0;
+      return;
+    }
+
+    resendIn = Math.min(total, 120);
+    const timer = setInterval(() => {
+      resendIn -= 1;
+      if (resendIn <= 0) clearInterval(timer);
+    }, 1000);
+  }
+
+  async function submitRestore() {
+    if (busy) return;
+    error = '';
+    notice = '';
+    suggested = [];
+
+    const value = login.trim();
+    if (!value) {
+      error = 'Введите логин или почту';
+      return;
+    }
+
+    busy = true;
+    try {
+      const result = await bridge.auth.restore(value);
+
+      if (!result || result.ok !== true) {
+        error = message(result && result.error);
+        return;
+      }
+
+      recovery = { data: value, hash: result.hash || '', password: '' };
+      code = '';
+      password = '';
+      repeat = '';
+      notice = 'Код для восстановления отправлен на почту';
+      startResendTimer(result.resendAfter);
+      mode = 'restoreVerify';
+    } catch (err) {
+      error = message(err && err.code ? err.code : 'unknown');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function submitRestoreVerify() {
+    if (busy || !recovery) return;
+    error = '';
+    notice = '';
+
+    const value = code.trim();
+    if (!/^\d{3,10}$/.test(value)) {
+      error = 'Код — это цифры из письма';
+      return;
+    }
+    if (password.length < 6) {
+      error = MESSAGES.bad_password;
+      return;
+    }
+    if (password !== repeat) {
+      error = 'Пароли не совпадают';
+      return;
+    }
+
+    busy = true;
+    try {
+      const result = await bridge.auth.restoreVerify({
+        data: recovery.data,
+        password,
+        hash: recovery.hash,
+        code: value,
+      });
+
+      if (!result || result.ok !== true) {
+        error = message(result && result.error);
+        return;
+      }
+
+      recovery = null;
+      password = '';
+      repeat = '';
+      onSuccess(result.profile);
+    } catch (err) {
+      error = message(err && err.code ? err.code : 'unknown');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function resendRestore() {
+    if (busy || !recovery || resendIn > 0) return;
+    error = '';
+    notice = '';
+
+    if (password.length < 6) {
+      error = 'Сначала придумайте новый пароль — он нужен для повторной отправки';
+      return;
+    }
+
+    busy = true;
+    try {
+      const result = await bridge.auth.restoreResend({
+        data: recovery.data,
+        password,
+        hash: recovery.hash,
+      });
+
+      if (!result || result.ok !== true) {
+        error = message(result && result.error);
+        return;
+      }
+
+      recovery = { ...recovery, hash: result.hash || recovery.hash };
+      notice = 'Код отправлен повторно';
+      startResendTimer(result.resendAfter);
+    } catch (err) {
+      error = message(err && err.code ? err.code : 'unknown');
+    } finally {
+      busy = false;
+    }
+  }
+
   /** @param {string} value */
   function pickSuggested(value) {
     login = value;
@@ -255,7 +386,11 @@
         {/if}
 
         <div class="auth-links">
-          <button type="button" class="auth-link" onclick={() => bridge.openExternal(SITE)}>
+          <button
+            type="button"
+            class="auth-link"
+            onclick={() => switchMode('restore')}
+          >
             Забыли пароль? Восстановить
           </button>
         </div>
@@ -369,6 +504,126 @@
             Войти
           </button>
         </p>
+      </form>
+    {:else if mode === 'restore'}
+      <h3 class="auth-title">Восстановление пароля</h3>
+      <p class="auth-sub">Укажите логин или почту — пришлём код для смены пароля</p>
+
+      <form
+        class="auth-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          submitRestore();
+        }}
+      >
+        <label class="auth-field">
+          <span>Логин или почта</span>
+          <input
+            type="text"
+            bind:value={login}
+            autocomplete="username"
+            placeholder="DinHem или name@example.com"
+            disabled={busy}
+          />
+        </label>
+
+        {#if error}
+          <p class="auth-error">{error}</p>
+        {/if}
+
+        <button type="submit" class="auth-submit" disabled={busy}>
+          {busy ? 'Отправляю…' : 'Отправить код'}
+        </button>
+
+        <p class="auth-switch">
+          Вспомнили пароль?
+          <button type="button" class="auth-link" onclick={() => switchMode('login')}>Войти</button>
+        </p>
+      </form>
+    {:else if mode === 'restoreVerify'}
+      <h3 class="auth-title">Новый пароль</h3>
+      <p class="auth-sub">
+        Код из письма и новый пароль для аккаунта {recovery ? recovery.data : ''}
+      </p>
+
+      <form
+        class="auth-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          submitRestoreVerify();
+        }}
+      >
+        <label class="auth-field">
+          <span>Код из письма</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            bind:value={code}
+            placeholder="0000"
+            maxlength="10"
+            disabled={busy}
+          />
+        </label>
+
+        <div class="auth-field-row">
+          <label class="auth-field">
+            <span>Новый пароль</span>
+            <div class="auth-password">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                bind:value={password}
+                autocomplete="new-password"
+                placeholder="минимум 6"
+                disabled={busy}
+              />
+              <button
+                type="button"
+                class="auth-eye"
+                title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                onclick={() => (showPassword = !showPassword)}
+              >
+                <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} stroke={1.8} />
+              </button>
+            </div>
+          </label>
+
+          <label class="auth-field">
+            <span>Ещё раз</span>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              bind:value={repeat}
+              autocomplete="new-password"
+              placeholder="повторите"
+              disabled={busy}
+            />
+          </label>
+        </div>
+
+        {#if notice}
+          <p class="auth-notice">{notice}</p>
+        {/if}
+
+        {#if error}
+          <p class="auth-error">{error}</p>
+        {/if}
+
+        <button type="submit" class="auth-submit" disabled={busy}>
+          {busy ? 'Проверяю…' : 'Сменить пароль и войти'}
+        </button>
+
+        <div class="auth-links">
+          <button
+            type="button"
+            class="auth-link"
+            onclick={resendRestore}
+            disabled={busy || resendIn > 0}
+          >
+            {resendIn > 0 ? `Отправить код заново через ${resendIn} с` : 'Отправить код заново'}
+          </button>
+          <button type="button" class="auth-link" onclick={() => switchMode('restore')} disabled={busy}>
+            Изменить данные
+          </button>
+        </div>
       </form>
     {:else}
       <h3 class="auth-title">Подтвердите почту</h3>

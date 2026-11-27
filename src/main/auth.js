@@ -354,10 +354,174 @@ async function verify(payload) {
   return acceptSession(json);
 }
 
+/**
+ * Запрос на восстановление пароля: код приходит на почту.
+ *
+ * Поле называется `data` — это логин или почта, сервер решает сам.
+ * Без поля data сервер отвечает code 0 и шлёт код «в никуда» — не повторять.
+ *
+ * @param {string} data
+ * @returns {Promise<{ok: boolean, error?: string, code?: number, hash?: string,
+ *   codeLength?: number, resendAfter?: number}>}
+ */
+async function restore(data) {
+  await load();
+
+  const host = await resolveHost();
+  const body = new URLSearchParams({ data }).toString();
+
+  let res;
+  try {
+    res = await request(`${host}/auth/restore`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': USER_AGENT,
+        'API-Version': 'v2',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        // Просим пятизначный код: он живёт дольше четырёхзначного.
+        'X-Long-Code': '1',
+      },
+      body,
+      timeoutMs: 20_000,
+      maxBytes: 512 * 1024,
+    });
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+
+  if (!res.text.trim()) return { ok: false, error: 'empty_response' };
+
+  let json;
+  try {
+    json = JSON.parse(res.text);
+  } catch {
+    return { ok: false, error: 'bad_response' };
+  }
+
+  if (json.code !== 0) {
+    // 2 — такого пользователя нет.
+    return { ok: false, error: json.code === 2 ? 'not_found' : `code_${json.code}`, code: json.code };
+  }
+
+  return {
+    ok: true,
+    hash: typeof json.hash === 'string' ? json.hash : '',
+    codeLength: Number(json.code_length) || 0,
+    resendAfter: Number(json.code_time_left) || 0,
+  };
+}
+
+/**
+ * Повторная отправка кода при восстановлении.
+ * @param {{data: string, password: string, hash: string}} payload
+ */
+async function restoreResend(payload) {
+  await load();
+
+  const host = await resolveHost();
+  const body = new URLSearchParams({
+    data: payload.data,
+    password: payload.password,
+    hash: payload.hash,
+  }).toString();
+
+  let res;
+  try {
+    res = await request(`${host}/auth/restore/resend`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': USER_AGENT,
+        'API-Version': 'v2',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Long-Code': '1',
+      },
+      body,
+      timeoutMs: 20_000,
+      maxBytes: 512 * 1024,
+    });
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+
+  if (!res.text.trim()) return { ok: false, error: 'empty_response' };
+
+  let json;
+  try {
+    json = JSON.parse(res.text);
+  } catch {
+    return { ok: false, error: 'bad_response' };
+  }
+
+  if (json.code !== 0) return { ok: false, error: `code_${json.code}`, code: json.code };
+
+  return {
+    ok: true,
+    hash: typeof json.hash === 'string' && json.hash ? json.hash : payload.hash,
+    resendAfter: Number(json.code_time_left) || 0,
+  };
+}
+
+/**
+ * Код + новый пароль. Успех сразу даёт токен — входить заново не нужно.
+ *
+ * @param {{data: string, password: string, hash: string, code: string}} payload
+ */
+async function restoreVerify(payload) {
+  await load();
+
+  if (!isSecureStorageAvailable()) {
+    return { ok: false, error: 'secure_storage_unavailable' };
+  }
+
+  const host = await resolveHost();
+  const body = new URLSearchParams({
+    data: payload.data,
+    password: payload.password,
+    hash: payload.hash,
+    code: payload.code,
+  }).toString();
+
+  let res;
+  try {
+    res = await request(`${host}/auth/restore/verify`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': USER_AGENT,
+        'API-Version': 'v2',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+      timeoutMs: 20_000,
+      maxBytes: 512 * 1024,
+    });
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+
+  if (!res.text.trim()) return { ok: false, error: 'empty_response' };
+
+  let json;
+  try {
+    json = JSON.parse(res.text);
+  } catch {
+    return { ok: false, error: 'bad_response' };
+  }
+
+  if (json.code !== 0) {
+    // 4 — код не подошёл.
+    return { ok: false, error: json.code === 4 ? 'bad_code' : `code_${json.code}`, code: json.code };
+  }
+
+  return acceptSession(json);
+}
+
 module.exports = {
   login,
   signUp,
   verify,
+  restore,
+  restoreResend,
+  restoreVerify,
   logout,
   getToken,
   getStatus,

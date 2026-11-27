@@ -36,6 +36,9 @@ const ALLOWED_CHANNELS = new Set([
   'auth:login',
   'auth:signup',
   'auth:verify',
+  'auth:restore',
+  'auth:restore-verify',
+  'auth:restore-resend',
   'auth:logout',
   'auth:status',
   'comments:list',
@@ -118,6 +121,11 @@ contextBridge.exposeInMainWorld('anixpas', {
     login: (login, password) => invoke('auth:login', { login, password }),
     signUp: (login, email, password) => invoke('auth:signup', { login, email, password }),
     verify: (payload) => invoke('auth:verify', payload),
+
+    /** @param {string} data логин или почта */
+    restore: (data) => invoke('auth:restore', { data }),
+    restoreVerify: (payload) => invoke('auth:restore-verify', payload),
+    restoreResend: (payload) => invoke('auth:restore-resend', payload),
     logout: () => invoke('auth:logout'),
     status: () => invoke('auth:status'),
   },
