@@ -355,7 +355,7 @@
             type="text"
             bind:value={login}
             autocomplete="username"
-            placeholder="DinHem"
+            placeholder="Логин или почта"
             disabled={busy}
           />
         </label>
@@ -522,7 +522,7 @@
             type="text"
             bind:value={login}
             autocomplete="username"
-            placeholder="DinHem или name@example.com"
+            placeholder="Логин или почта"
             disabled={busy}
           />
         </label>

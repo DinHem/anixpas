@@ -48,6 +48,10 @@
   let mode = $state('grid');
   /** @type {any|null} */
   let lastWatched = $state(null);
+  /** Плашка «Продолжить просмотр» закрыта человеком: ключ — тайтл + серия. */
+  let continueHidden = $state('');
+  /** Показывать кнопку «наверх», когда прокрутили далеко. */
+  let showUp = $state(false);
 
   /** @type {HTMLElement|null} */
   let sentinel = $state(null);
@@ -135,6 +139,21 @@
     await load(true);
   }
 
+  /** Ключ «этот тайтл + эта серия»: после новой серии плашка вернётся. */
+  const continueKey = $derived(
+    lastWatched ? `${lastWatched.releaseId}:${lastWatched.lastPosition}` : ''
+  );
+
+  function hideContinue() {
+    continueHidden = continueKey;
+    bridge.settings.set('continueHidden', continueKey).catch(() => {});
+  }
+
+  function scrollToTop() {
+    const scroller = document.querySelector('.main');
+    if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   /** @param {'grid'|'list'} next */
   function setMode(next) {
     mode = next;
@@ -147,6 +166,7 @@
       if (saved.catalogMode === 'list' || saved.catalogMode === 'grid') mode = saved.catalogMode;
       if (COUNTRIES.some((c) => c.id === saved.catalogCountry)) country = saved.catalogCountry;
       if (TABS.some((t) => t.id === saved.catalogTab)) tab = saved.catalogTab;
+      if (typeof saved.continueHidden === 'string') continueHidden = saved.continueHidden;
     } catch {
       /* значения по умолчанию */
     }
@@ -230,8 +250,12 @@
     if (!scroller) return;
 
     const onScroll = () => {
+      // Кнопка «наверх» появляется после примерно двух экранов.
+      showUp = scroller.scrollTop > 900;
       if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 600) load();
     };
+
+    onScroll();
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
     return () => scroller.removeEventListener('scroll', onScroll);
@@ -286,20 +310,26 @@
 </div>
 
 <div class="scrollarea">
-  {#if lastWatched}
-    <button class="continue-card" onclick={() => onContinue(lastWatched.releaseId)}>
-      <div class="continue-poster">
-        {#if lastWatched.poster}
-          <img src={lastWatched.poster} alt="" referrerpolicy="no-referrer" />
-        {/if}
-      </div>
-      <div class="continue-body">
-        <div class="continue-label">Продолжить просмотр</div>
-        <div class="continue-title">{lastWatched.title || 'Без названия'}</div>
-        <div class="continue-meta">{lastWatched.lastPosition} серия</div>
-      </div>
-      <div class="continue-play"><Icon name="play" size={18} /></div>
-    </button>
+  {#if lastWatched && continueHidden !== continueKey}
+    <div class="continue-wrap">
+      <button class="continue-card" onclick={() => onContinue(lastWatched.releaseId)}>
+        <div class="continue-poster">
+          {#if lastWatched.poster}
+            <img src={lastWatched.poster} alt="" referrerpolicy="no-referrer" />
+          {/if}
+        </div>
+        <div class="continue-body">
+          <div class="continue-label">Продолжить просмотр</div>
+          <div class="continue-title">{lastWatched.title || 'Без названия'}</div>
+          <div class="continue-meta">{lastWatched.lastPosition} серия</div>
+        </div>
+        <div class="continue-play"><Icon name="play" size={18} /></div>
+      </button>
+
+      <button class="continue-close" title="Скрыть до следующей серии" onclick={hideContinue}>
+        <Icon name="close" size={15} stroke={2.2} />
+      </button>
+    </div>
   {/if}
 
   {#if error}
@@ -373,6 +403,12 @@
     {/if}
   </div>
 </div>
+
+{#if showUp}
+  <button class="scroll-up" title="Наверх" aria-label="Наверх" onclick={scrollToTop}>
+    <Icon name="chevron-down" size={18} stroke={2} class="scroll-up-icon" />
+  </button>
+{/if}
 
 {#if menuItem}
   <ReleaseMenu

@@ -3914,3 +3914,85 @@ button.primary:hover:not(:disabled) {
 .update-release-body .update-modal-section {
   margin-top: var(--s-3);
 }
+
+/* Плашка «Продолжить просмотр»: крестик и обёртка для позиционирования */
+.continue-wrap {
+  position: relative;
+}
+
+.continue-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  opacity: 0.75;
+  transition: opacity var(--t-fast), color var(--t-fast);
+}
+
+.continue-wrap:hover .continue-close,
+.continue-close:focus-visible {
+  opacity: 1;
+  color: var(--text);
+}
+
+.continue-close:hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+
+/* Кнопка «наверх» */
+.scroll-up {
+  position: fixed;
+  right: var(--s-5);
+  bottom: var(--s-5);
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-2);
+  backdrop-filter: blur(var(--glass-blur-2));
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+
+.scroll-up:hover {
+  background: var(--panel-3);
+  transform: translateY(-2px);
+}
+
+/* Стрелка вниз, повёрнутая вверх. */
+.scroll-up-icon {
+  transform: rotate(180deg);
+}
+
+/* Плашку обновления поднимаем выше, чтобы не спорить с кнопкой. */
+.update-toast {
+  bottom: calc(var(--s-5) + 60px);
+}
+
+/*
+ * Вкладки каталога липнут к верху прокрутки: переключить «Последнее → Онгоинги»
+ * можно с любой глубины, не возвращаясь наверх.
+ */
+.subtabs {
+  position: sticky;
+  top: calc(-1 * var(--s-5));
+  z-index: 9;
+  margin-inline: calc(-1 * var(--s-6));
+  padding: var(--s-5) var(--s-6) var(--s-3);
+  background: var(--bg);
+  box-shadow: 0 1px 0 var(--border);
+}
