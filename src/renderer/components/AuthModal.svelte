@@ -1,101 +1,426 @@
 <script>
-  /** Модальное окно входа в Anixart. */
+  /**
+   * Вход и регистрация Anixart.
+   *
+   * Три состояния: вход, регистрация (логин + почта + пароль) и подтверждение
+   * почты кодом из письма. Токен в renderer не попадает — его хранит main.
+   */
+  import Icon from './Icon.svelte';
   import { bridge } from '../lib/bridge.js';
 
   /** @type {{ onClose: () => void, onSuccess: (profile: any) => void }} */
   let { onClose, onSuccess } = $props();
 
+  /** @type {'login'|'signup'|'verify'} */
+  let mode = $state('login');
+
   let login = $state('');
+  let email = $state('');
   let password = $state('');
-  let loading = $state(false);
+  let repeat = $state('');
+  let code = $state('');
+
+  /** @type {{hash: string, email: string, login: string, password: string}|null} */
+  let pending = $state(null);
+  /** @type {string[]} */
+  let suggested = $state([]);
+
+  let busy = $state(false);
   let error = $state('');
+  let notice = $state('');
   let showPassword = $state(false);
+
+  /** Сайт Anixart: восстановление пароля живёт там, API для него закрыт. */
+  const SITE = 'https://anixart-app.com/';
 
   /** Понятные тексты вместо кодов. */
   const MESSAGES = {
     bad_credentials: 'Неверный логин или пароль',
+    bad_login: 'Логин не подходит: 3–20 символов, буквы, цифры, дефис',
+    bad_email: 'Проверьте адрес почты',
+    bad_password: 'Пароль слишком короткий — минимум 6 символов',
+    login_taken: 'Такой логин уже занят',
+    bad_code: 'Код не подошёл — проверьте письмо или запросите новый',
     network: 'Нет связи с Anixart. Проверьте интернет',
     empty_response: 'Сервер не ответил. Попробуйте позже',
     bad_response: 'Неожиданный ответ сервера',
     no_token: 'Сервер не выдал токен',
-    secure_storage_unavailable:
-      'Системное хранилище паролей недоступно — вход невозможен',
-    invalid_args: 'Проверьте логин и пароль',
+    secure_storage_unavailable: 'Системное хранилище паролей недоступно — вход невозможен',
+    invalid_args: 'Проверьте введённые данные',
   };
 
-  async function submit() {
-    if (loading) return;
+  /** @param {string} value */
+  function message(value) {
+    if (value && value.startsWith('code_')) return `Сервер отклонил запрос (${value.slice(5)})`;
+    return MESSAGES[value] || 'Не получилось. Попробуйте ещё раз';
+  }
 
+  function switchMode(next) {
+    mode = next;
     error = '';
-    const value = login.trim();
+    notice = '';
+    suggested = [];
+  }
 
+  async function submitLogin() {
+    if (busy) return;
+    error = '';
+
+    const value = login.trim();
     if (!value || !password) {
       error = 'Заполните логин и пароль';
       return;
     }
 
-    loading = true;
-
+    busy = true;
     try {
       const profile = await bridge.auth.login(value, password);
-      // Пароль в памяти не держим.
       password = '';
       onSuccess(profile);
     } catch (err) {
-      const code = err && err.code ? err.code : 'unknown';
-      error = MESSAGES[code] || `Не удалось войти (${code})`;
+      error = message(err && err.code ? err.code : 'unknown');
     } finally {
-      loading = false;
+      busy = false;
     }
+  }
+
+  async function submitSignup() {
+    if (busy) return;
+    error = '';
+    notice = '';
+    suggested = [];
+
+    const name = login.trim();
+    const mail = email.trim();
+
+    if (name.length < 3) {
+      error = MESSAGES.bad_login;
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(mail)) {
+      error = MESSAGES.bad_email;
+      return;
+    }
+    if (password.length < 6) {
+      error = MESSAGES.bad_password;
+      return;
+    }
+    if (password !== repeat) {
+      error = 'Пароли не совпадают';
+      return;
+    }
+
+    busy = true;
+    try {
+      const result = await bridge.auth.signUp(name, mail, password);
+
+      if (!result || result.ok !== true) {
+        error = message(result && result.error);
+        suggested = (result && result.suggested) || [];
+        return;
+      }
+
+      pending = { hash: result.hash || '', email: mail, login: name, password };
+      code = '';
+      email = '';
+      notice = `Код отправлен на ${mail}`;
+      mode = 'verify';
+    } catch (err) {
+      error = message(err && err.code ? err.code : 'unknown');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function submitVerify() {
+    if (busy || !pending) return;
+    error = '';
+    notice = '';
+
+    const value = code.trim();
+    if (!/^\d{3,10}$/.test(value)) {
+      error = 'Код — это цифры из письма';
+      return;
+    }
+
+    busy = true;
+    try {
+      const result = await bridge.auth.verify({
+        login: pending.login,
+        email: pending.email,
+        password: pending.password,
+        hash: pending.hash,
+        code: value,
+      });
+
+      if (!result || result.ok !== true) {
+        error = message(result && result.error);
+        return;
+      }
+
+      pending = null;
+      password = '';
+      onSuccess(result.profile);
+    } catch (err) {
+      error = message(err && err.code ? err.code : 'unknown');
+    } finally {
+      busy = false;
+    }
+  }
+
+  /** Повторная отправка кода: та же заявка, письмо новое. */
+  async function resend() {
+    if (busy || !pending) return;
+    error = '';
+    busy = true;
+
+    try {
+      const result = await bridge.auth.signUp(pending.login, pending.email, pending.password);
+      if (!result || result.ok !== true) {
+        error = message(result && result.error);
+        return;
+      }
+      pending = { ...pending, hash: result.hash || pending.hash };
+      notice = 'Код отправлен повторно';
+    } catch (err) {
+      error = message(err && err.code ? err.code : 'unknown');
+    } finally {
+      busy = false;
+    }
+  }
+
+  /** @param {string} value */
+  function pickSuggested(value) {
+    login = value;
+    suggested = [];
+    error = '';
   }
 </script>
 
-<div class="modal-backdrop" role="presentation" onclick={onClose}>
-  <div class="modal auth-modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
-    <h3>Вход в Anixart</h3>
-    <p class="meta">Логин и пароль от аккаунта Anixart. Токен хранится в защищённом хранилище системы.</p>
+<div class="modal-backdrop auth-backdrop" role="presentation" onclick={onClose}>
+  <div class="auth-card" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
+    <div class="auth-brand">
+      <span class="auth-logo"><Icon name="play" size={20} stroke={0} /></span>
+      <span class="auth-brand-name">AnixPas</span>
+      <button class="auth-close" title="Закрыть" onclick={onClose}>
+        <Icon name="close" size={16} stroke={2.2} />
+      </button>
+    </div>
 
-    <form
-      onsubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-    >
-      <label class="field">
-        <span>Логин</span>
-        <input type="text" bind:value={login} autocomplete="username" disabled={loading} />
-      </label>
+    {#if mode === 'login'}
+      <h3 class="auth-title">С возвращением</h3>
+      <p class="auth-sub">Войдите, чтобы продолжить</p>
 
-      <label class="field">
-        <span>Пароль</span>
-        <div class="password-row">
+      <form
+        class="auth-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          submitLogin();
+        }}
+      >
+        <label class="auth-field">
+          <span>Почта или никнейм</span>
           <input
-            type={showPassword ? 'text' : 'password'}
-            bind:value={password}
-            autocomplete="current-password"
-            disabled={loading}
+            type="text"
+            bind:value={login}
+            autocomplete="username"
+            placeholder="DinHem"
+            disabled={busy}
           />
-          <button
-            type="button"
-            class="pbtn"
-            onclick={() => (showPassword = !showPassword)}
-            title={showPassword ? 'Скрыть' : 'Показать'}
-          >
-            {showPassword ? '🙈' : '👁'}
+        </label>
+
+        <label class="auth-field">
+          <span>Пароль</span>
+          <div class="auth-password">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              bind:value={password}
+              autocomplete="current-password"
+              placeholder="••••••••"
+              disabled={busy}
+            />
+            <button
+              type="button"
+              class="auth-eye"
+              title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+              onclick={() => (showPassword = !showPassword)}
+            >
+              <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} stroke={1.8} />
+            </button>
+          </div>
+        </label>
+
+        {#if error}
+          <p class="auth-error">{error}</p>
+        {/if}
+
+        <div class="auth-links">
+          <button type="button" class="auth-link" onclick={() => bridge.openExternal(SITE)}>
+            Забыли пароль? Восстановить
           </button>
         </div>
-      </label>
 
-      {#if error}
-        <p class="err">{error}</p>
-      {/if}
-
-      <div class="modal-actions">
-        <button type="submit" class="primary" disabled={loading}>
-          {loading ? 'Вход…' : 'Войти'}
+        <button type="submit" class="auth-submit" disabled={busy}>
+          {busy ? 'Вход…' : 'Войти'}
         </button>
-        <button type="button" onclick={onClose} disabled={loading}>Отмена</button>
-      </div>
-    </form>
+
+        <p class="auth-switch">
+          Нет профиля?
+          <button type="button" class="auth-link" onclick={() => switchMode('signup')}>
+            Регистрация
+          </button>
+        </p>
+
+        <button type="button" class="auth-skip" onclick={onClose} disabled={busy}>
+          Продолжить без входа
+        </button>
+      </form>
+    {:else if mode === 'signup'}
+      <h3 class="auth-title">Регистрация</h3>
+      <p class="auth-sub">Логин, почта и пароль — код подтверждения придёт на почту</p>
+
+      <form
+        class="auth-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          submitSignup();
+        }}
+      >
+        <label class="auth-field">
+          <span>Логин</span>
+          <input
+            type="text"
+            bind:value={login}
+            autocomplete="username"
+            placeholder="3–20 символов"
+            disabled={busy}
+          />
+        </label>
+
+        <label class="auth-field">
+          <span>Почта</span>
+          <input
+            type="email"
+            bind:value={email}
+            autocomplete="email"
+            placeholder="name@example.com"
+            disabled={busy}
+          />
+        </label>
+
+        <div class="auth-field-row">
+          <label class="auth-field">
+            <span>Пароль</span>
+            <div class="auth-password">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                bind:value={password}
+                autocomplete="new-password"
+                placeholder="минимум 6"
+                disabled={busy}
+              />
+              <button
+                type="button"
+                class="auth-eye"
+                title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                onclick={() => (showPassword = !showPassword)}
+              >
+                <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} stroke={1.8} />
+              </button>
+            </div>
+          </label>
+
+          <label class="auth-field">
+            <span>Ещё раз</span>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              bind:value={repeat}
+              autocomplete="new-password"
+              placeholder="повторите"
+              disabled={busy}
+            />
+          </label>
+        </div>
+
+        {#if error}
+          <p class="auth-error">{error}</p>
+        {/if}
+
+        {#if suggested.length}
+          <div class="auth-suggest">
+            <span class="auth-suggest-label">Свободные варианты</span>
+            <div class="auth-suggest-list">
+              {#each suggested as value}
+                <button type="button" class="auth-chip" onclick={() => pickSuggested(value)}>
+                  {value}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <button type="submit" class="auth-submit" disabled={busy}>
+          {busy ? 'Отправляю…' : 'Зарегистрироваться'}
+        </button>
+
+        <p class="auth-switch">
+          Уже есть аккаунт?
+          <button type="button" class="auth-link" onclick={() => switchMode('login')}>
+            Войти
+          </button>
+        </p>
+      </form>
+    {:else}
+      <h3 class="auth-title">Подтвердите почту</h3>
+      <p class="auth-sub">
+        Введите код из письма. Если письма нет — проверьте «Спам» или запросите новый.
+      </p>
+
+      <form
+        class="auth-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          submitVerify();
+        }}
+      >
+        <label class="auth-field">
+          <span>Код из письма</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            bind:value={code}
+            placeholder="000000"
+            maxlength="10"
+            disabled={busy}
+          />
+        </label>
+
+        {#if notice}
+          <p class="auth-notice">{notice}</p>
+        {/if}
+
+        {#if error}
+          <p class="auth-error">{error}</p>
+        {/if}
+
+        <button type="submit" class="auth-submit" disabled={busy}>
+          {busy ? 'Проверяю…' : 'Подтвердить'}
+        </button>
+
+        <div class="auth-links">
+          <button type="button" class="auth-link" onclick={resend} disabled={busy}>
+            Отправить код заново
+          </button>
+          <button type="button" class="auth-link" onclick={() => switchMode('signup')} disabled={busy}>
+            Изменить данные
+          </button>
+        </div>
+      </form>
+    {/if}
+
+    <p class="auth-legal">
+      Продолжая, вы принимаете условия Anixart. Приложение не хранит пароль —
+      только токен в защищённом хранилище системы.
+    </p>
   </div>
 </div>

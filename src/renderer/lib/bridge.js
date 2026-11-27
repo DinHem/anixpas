@@ -100,6 +100,13 @@ export const bridge = {
 
   auth: {
     login: (login, password) => unwrap(api.auth.login(login, password)),
+
+    /** @param {string} login @param {string} email @param {string} password */
+    signUp: (login, email, password) =>
+      unwrap(api.auth.signUp(login, email, password)),
+
+    /** @param {{login: string, email: string, password: string, hash: string, code: string}} payload */
+    verify: (payload) => unwrap(api.auth.verify(plain(payload))),
     logout: () => unwrap(api.auth.logout()),
     status: () => unwrap(api.auth.status()),
   },

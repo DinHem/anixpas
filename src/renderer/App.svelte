@@ -106,16 +106,26 @@
       releaseId = Number(match[2]);
       view = match[1] === 'release' ? 'release' : 'watch';
       autoPlay = match[1] === 'player';
+    } else if (hash === 'auth') {
+      showAuth = true;
     } else if (['search', 'profile', 'bookmarks', 'status'].includes(hash)) {
       view = hash;
     }
 
-    // Обновления проверяем фоном: через 10 с после запуска и дальше раз в 6 часов.
-    setTimeout(() => checkForUpdates(true), 10000);
+    // Обновления проверяем фоном: через 3 с после запуска и дальше раз в 6 часов.
+    setTimeout(() => checkForUpdates(true), 3000);
     const timer = setInterval(() => checkForUpdates(true), 6 * 60 * 60 * 1000);
-    return () => clearInterval(timer);
 
+    // Отладка: location.hash = 'auth' открывает экран входа.
+    const onHash = () => {
+      if (location.hash === '#auth') showAuth = true;
+    };
+    window.addEventListener('hashchange', onHash);
 
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('hashchange', onHash);
+    };
   });
   /** @param {any} profile */
   function handleLogin(profile) {

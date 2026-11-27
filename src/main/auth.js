@@ -155,7 +155,12 @@ async function login(login, password) {
 
   // Код 2 — неверный логин или пароль.
   if (json.code !== 0) {
-    return { ok: false, error: json.code === 2 ? 'bad_credentials' : `code_${json.code}` };
+    // 2 — пользователь не найден, 3 — неверный пароль. Наружу не различаем:
+    // иначе приложение подсказывает, какие логины существуют.
+    return {
+      ok: false,
+      error: json.code === 2 || json.code === 3 ? 'bad_credentials' : `code_${json.code}`,
+    };
   }
 
   const token = json.profileToken && json.profileToken.token;
@@ -205,4 +210,156 @@ async function getStatus() {
   };
 }
 
-module.exports = { login, logout, getToken, getStatus, isSecureStorageAvailable };
+/**
+ * Коды ответа /auth/signUp, проверенные живьём:
+ * 2 — логин не подходит, 3 — почта не подходит, 4 — пароль не подходит,
+ * 5 — логин занят (сервер присылает свободные варианты).
+ */
+const SIGNUP_ERRORS = {
+  2: 'bad_login',
+  3: 'bad_email',
+  4: 'bad_password',
+  5: 'login_taken',
+};
+
+/** Общий разбор ответа: токен, профиль, кэш. */
+async function acceptSession(json) {
+  const token = json.profileToken && json.profileToken.token;
+  if (typeof token !== 'string' || !token) return { ok: false, error: 'no_token' };
+
+  state.token = token;
+  state.profile = sanitizeProfile(json.profile);
+  await persist();
+
+  // Данные стали персональными — прежний кэш не подходит.
+  require('./cache.js').setUserScope(state.profile ? state.profile.id : null);
+
+  return { ok: true, profile: state.profile };
+}
+
+/**
+ * Заявка на регистрацию: сервер отправляет код на почту.
+ *
+ * @param {string} login
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<{ok: boolean, error?: string, code?: number, hash?: string,
+ *   suggested?: string[], expiresAt?: number}>}
+ */
+async function signUp(login, email, password) {
+  await load();
+
+  if (!isSecureStorageAvailable()) {
+    return { ok: false, error: 'secure_storage_unavailable' };
+  }
+
+  const host = await resolveHost();
+  const body = new URLSearchParams({ login, email, password }).toString();
+
+  let res;
+  try {
+    res = await request(`${host}/auth/signUp`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': USER_AGENT,
+        'API-Version': 'v2',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+      timeoutMs: 20_000,
+      maxBytes: 512 * 1024,
+    });
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+
+  if (!res.text.trim()) return { ok: false, error: 'empty_response' };
+
+  let json;
+  try {
+    json = JSON.parse(res.text);
+  } catch {
+    return { ok: false, error: 'bad_response' };
+  }
+
+  if (json.code !== 0) {
+    return {
+      ok: false,
+      error: SIGNUP_ERRORS[json.code] || `code_${json.code}`,
+      code: json.code,
+      suggested: Array.isArray(json.suggested_logins) ? json.suggested_logins.slice(0, 5) : [],
+    };
+  }
+
+  // hash нужен на втором шаге вместе с кодом из письма.
+  return {
+    ok: true,
+    hash: typeof json.hash === 'string' ? json.hash : '',
+    expiresAt: Number(json.codeTimestampExpires) || 0,
+  };
+}
+
+/**
+ * Подтверждение почты кодом. Успех даёт токен — дальше как обычный вход.
+ *
+ * @param {{login: string, email: string, password: string, hash: string, code: string}} payload
+ * @returns {Promise<{ok: boolean, error?: string, code?: number, profile?: any}>}
+ */
+async function verify(payload) {
+  await load();
+
+  if (!isSecureStorageAvailable()) {
+    return { ok: false, error: 'secure_storage_unavailable' };
+  }
+
+  const host = await resolveHost();
+  const body = new URLSearchParams({
+    login: payload.login,
+    email: payload.email,
+    hash: payload.hash,
+    password: payload.password,
+    code: payload.code,
+  }).toString();
+
+  let res;
+  try {
+    res = await request(`${host}/auth/verify`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': USER_AGENT,
+        'API-Version': 'v2',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+      timeoutMs: 20_000,
+      maxBytes: 512 * 1024,
+    });
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+
+  if (!res.text.trim()) return { ok: false, error: 'empty_response' };
+
+  let json;
+  try {
+    json = JSON.parse(res.text);
+  } catch {
+    return { ok: false, error: 'bad_response' };
+  }
+
+  if (json.code !== 0) {
+    return { ok: false, error: 'bad_code', code: json.code };
+  }
+
+  return acceptSession(json);
+}
+
+module.exports = {
+  login,
+  signUp,
+  verify,
+  logout,
+  getToken,
+  getStatus,
+  isSecureStorageAvailable,
+};

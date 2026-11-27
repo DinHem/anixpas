@@ -34,6 +34,8 @@ const ALLOWED_CHANNELS = new Set([
   'bookmarks:set-vote',
   'bookmarks:set-favorite',
   'auth:login',
+  'auth:signup',
+  'auth:verify',
   'auth:logout',
   'auth:status',
   'comments:list',
@@ -114,6 +116,8 @@ contextBridge.exposeInMainWorld('anixpas', {
 
   auth: {
     login: (login, password) => invoke('auth:login', { login, password }),
+    signUp: (login, email, password) => invoke('auth:signup', { login, email, password }),
+    verify: (payload) => invoke('auth:verify', payload),
     logout: () => invoke('auth:logout'),
     status: () => invoke('auth:status'),
   },

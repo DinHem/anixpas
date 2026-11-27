@@ -503,6 +503,33 @@ function registerIpc() {
     return ok(await cache.size());
   });
 
+  register(CHANNELS.AUTH_SIGNUP, async (payload) => {
+    if (!validators.isPlainObject(payload)) return fail('invalid_args');
+    if (!validators.isCredential(payload.login)) return fail('invalid_args');
+    if (!validators.isEmail(payload.email)) return fail('invalid_args');
+    if (!validators.isCredential(payload.password)) return fail('invalid_args');
+    return ok(await auth.signUp(payload.login.trim(), payload.email.trim(), payload.password));
+  });
+
+  register(CHANNELS.AUTH_VERIFY, async (payload) => {
+    if (!validators.isPlainObject(payload)) return fail('invalid_args');
+    if (!validators.isCredential(payload.login)) return fail('invalid_args');
+    if (!validators.isEmail(payload.email)) return fail('invalid_args');
+    if (!validators.isCredential(payload.password)) return fail('invalid_args');
+    if (typeof payload.hash !== 'string' || payload.hash.length > 300) return fail('invalid_args');
+    if (!validators.isCode(String(payload.code || ''))) return fail('invalid_args');
+
+    return ok(
+      await auth.verify({
+        login: payload.login.trim(),
+        email: payload.email.trim(),
+        password: payload.password,
+        hash: payload.hash,
+        code: String(payload.code),
+      })
+    );
+  });
+
   register(CHANNELS.UPDATER_CHECK, async (payload) => {
     if (!validators.isNoArgs(payload)) return fail('invalid_args');
     return ok(await updater.check());

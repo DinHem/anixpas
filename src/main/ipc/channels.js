@@ -29,6 +29,8 @@ const CHANNELS = {
   BOOKMARKS_SET_VOTE: 'bookmarks:set-vote',
   BOOKMARKS_SET_FAVORITE: 'bookmarks:set-favorite',
   AUTH_LOGIN: 'auth:login',
+  AUTH_SIGNUP: 'auth:signup',
+  AUTH_VERIFY: 'auth:verify',
   AUTH_LOGOUT: 'auth:logout',
   AUTH_STATUS: 'auth:status',
   COMMENTS: 'comments:list',
@@ -85,6 +87,11 @@ const validators = {
     (Array.isArray(v) && v.length <= 20 && v.every((n) => Number.isInteger(n) && n > 0 && n < 1e6)),
 
   /** Жанры — массив коротких строк, не больше 10. */
+  /** Строки для форм входа: логин, почта, пароль, код. */
+  isCredential: (v) => typeof v === 'string' && v.length > 0 && v.length <= 200,
+  isEmail: (v) => typeof v === 'string' && v.length >= 3 && v.length <= 200 && v.includes('@'),
+  isCode: (v) => typeof v === 'string' && /^[0-9]{3,10}$/.test(v),
+
   areGenres: (v) =>
     v === undefined ||
     (Array.isArray(v) &&
