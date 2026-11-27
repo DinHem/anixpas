@@ -155,6 +155,18 @@
     await load(true);
   }
 
+  /**
+   * Перечитывает «продолжить просмотр». Каталог живёт в DOM постоянно, поэтому
+   * без этого плашка обновлялась бы только при запуске приложения.
+   */
+  async function refreshContinue() {
+    try {
+      lastWatched = await bridge.progress.last();
+    } catch {
+      /* прогресса нет — плашки не будет */
+    }
+  }
+
   /** Ключ «этот тайтл + эта серия»: после новой серии плашка вернётся. */
   const continueKey = $derived(
     lastWatched ? `${lastWatched.releaseId}:${lastWatched.lastPosition}` : ''
@@ -187,10 +199,7 @@
       /* значения по умолчанию */
     }
 
-    bridge.progress
-      .last()
-      .then((value) => (lastWatched = value))
-      .catch(() => {});
+    await refreshContinue();
 
     await load();
 
@@ -230,6 +239,9 @@
     lastRefresh = refreshKey;
 
     (async () => {
+      // Смотрели серию и вернулись — плашка должна показать именно её.
+      refreshContinue();
+
       try {
         const fresh = await bridge.catalog(0, currentFilter(), true);
         const known = new Set(fresh.map((i) => i.id));
