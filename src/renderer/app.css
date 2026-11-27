@@ -4117,3 +4117,36 @@ button.primary:hover:not(:disabled) {
   border-radius: var(--r-md);
   background: var(--panel);
 }
+
+/*
+ * Крестик не должен нависать над кнопкой «Плей»: сдвигаем его в угол и
+ * оставляем место справа, чтобы элементы не пересекались.
+ */
+.continue-wrap {
+  padding-right: 0;
+}
+
+.continue-card {
+  padding-right: 46px;
+}
+
+.continue-close {
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+/* Кнопка «Плей» остаётся у правого края, но ниже крестика */
+.continue-play {
+  margin-right: 0;
+}
+
+/* «Сбросить» в шапке фильтров: у .linkbtn есть нижний отступ, из-за него кнопка
+   висела выше остальных. В шапке выравниваем по центру строки. */
+.filter-head-actions .linkbtn {
+  margin-bottom: 0;
+  line-height: 1;
+}
