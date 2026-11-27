@@ -34,8 +34,13 @@ const MANIFEST = 'latest.json';
 const FAKE = process.argv.includes('--fake-update') && !app.isPackaged;
 if (!app.isPackaged) console.log('[updater] flags:', process.argv.filter((a) => a.startsWith('--')).join(' '), '| fake:', FAKE);
 const SIGNATURE = 'latest.json.sig';
-/** Сколько ждём ответ, мс. */
-const TIMEOUT = 15000;
+/** Манифест маленький: ждём ответ не дольше 15 секунд. */
+const MANIFEST_TIMEOUT = 15000;
+/**
+ * Установщик — 120 МБ. Общий таймаут тут ставить нельзя: у кого медленный канал
+ * или VPN, скачивание рвётся на середине. Ждём «нет данных дольше минуты».
+ */
+const DOWNLOAD_IDLE_TIMEOUT = 60000;
 
 /** @type {{file: string, version: string}|null} */
 let downloaded = null;
@@ -92,12 +97,12 @@ function isTrustedUrl(url) {
  * @param {string} url
  * @returns {Promise<Response>}
  */
-async function get(url) {
+async function get(url, timeoutMs = MANIFEST_TIMEOUT) {
   if (!isTrustedUrl(url)) throw new Error('untrusted_url');
 
   const response = await fetch(url, {
     redirect: 'follow',
-    signal: AbortSignal.timeout(TIMEOUT),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: { 'User-Agent': `AnixPas/${app.getVersion()}` },
   });
 
@@ -222,11 +227,35 @@ function takeDownloaded() {
  * @param {(progress: {received: number, total: number, percent: number}) => void} onProgress
  */
 async function download(payload, onProgress) {
-  if (!payload || !isTrustedUrl(String(payload.url))) throw new Error('untrusted_url');
+  if (!payload || !isTrustedUrl(String(payload.url))) return { ok: false, error: 'untrusted_url' };
   if (downloading) return downloading;
 
   downloading = (async () => {
-    const response = await get(String(payload.url));
+    const controller = new AbortController();
+    let idleTimer = setTimeout(() => controller.abort(), DOWNLOAD_IDLE_TIMEOUT);
+    const keepAlive = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => controller.abort(), DOWNLOAD_IDLE_TIMEOUT);
+    };
+
+    let response;
+    try {
+      response = await fetch(String(payload.url), {
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: { 'User-Agent': `AnixPas/${app.getVersion()}` },
+      });
+      if (!response.ok) throw new Error(`http_${response.status}`);
+      if (response.url && !String(response.url).startsWith('https://')) {
+        throw new Error('insecure_redirect');
+      }
+    } catch (err) {
+      clearTimeout(idleTimer);
+      const code = err && err.name === 'AbortError' ? 'timeout' : 'network';
+      console.error('[updater] скачивание:', code, err && err.message);
+      return { ok: false, error: code };
+    }
+
     const total = Number(response.headers.get('content-length')) || Number(payload.size) || 0;
 
     const dir = path.join(app.getPath('temp'), 'anixpas-update');
@@ -240,10 +269,22 @@ async function download(payload, onProgress) {
     try {
       const reader = response.body.getReader();
       for (;;) {
-        const { done, value } = await reader.read();
+        let chunk;
+        try {
+          chunk = await reader.read();
+        } catch (err) {
+          // Долго нет данных или сеть пропала — сообщаем внятно.
+          const code = err && err.name === 'AbortError' ? 'timeout' : 'network';
+          console.error('[updater] поток:', code, err && err.message);
+          // Файл и таймер закроет finally ниже.
+          return { ok: false, error: code };
+        }
+
+        const { done, value } = chunk;
         if (done) break;
         if (!value) continue;
 
+        keepAlive();
         received += value.length;
         hash.update(value);
         await handle.write(value);
@@ -257,17 +298,19 @@ async function download(payload, onProgress) {
         }
       }
     } finally {
+      clearTimeout(idleTimer);
       await handle.close();
     }
 
     const actual = hash.digest('hex');
     if (payload.sha512 && actual !== String(payload.sha512)) {
       await fsp.rm(file, { force: true });
-      throw new Error('checksum');
+      console.error('[updater] контрольная сумма не совпала');
+      return { ok: false, error: 'checksum' };
     }
 
     downloaded = { file, version: String(payload.version) };
-    return { file, size: received };
+    return { ok: true, file, size: received };
   })();
 
   try {
@@ -283,18 +326,18 @@ async function download(payload, onProgress) {
  */
 function install(file) {
   const target = String(file || '');
-  if (!target || !fs.existsSync(target)) throw new Error('no_installer');
+  if (!target || !fs.existsSync(target)) return { ok: false, error: 'no_installer' };
 
   // Только исполняемый файл из нашей временной папки обновлений.
   const dir = path.join(app.getPath('temp'), 'anixpas-update');
-  if (path.dirname(path.resolve(target)) !== path.resolve(dir)) throw new Error('bad_path');
-  if (!target.toLowerCase().endsWith('.exe')) throw new Error('bad_path');
+  if (path.dirname(path.resolve(target)) !== path.resolve(dir)) return { ok: false, error: 'bad_path' };
+  if (!target.toLowerCase().endsWith('.exe')) return { ok: false, error: 'bad_path' };
 
   spawn(target, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref();
 
   // Даём установщику подняться, затем выходим: он не сможет заменить запущенный файл.
   setTimeout(() => app.quit(), 4000);
-  return { started: true };
+  return { ok: true, started: true };
 }
 
 module.exports = { check, download, install, takeDownloaded, compareVersions };

@@ -589,7 +589,8 @@ function registerIpc() {
       }
     );
 
-    return ok({ file: result.file, size: result.size });
+    // Отдаём ответ как есть: внутри уже есть ok/error и причина сбоя.
+    return ok(result);
   });
 
   register(CHANNELS.UPDATER_INSTALL, async (payload) => {

@@ -107,12 +107,22 @@ export async function downloadUpdate() {
       version: state.available.version,
       sha512: state.available.sha512,
     });
+
+    // main возвращает код причины: timeout, network, checksum, untrusted_url.
+    if (!result || result.ok !== true) {
+      state.downloading = false;
+      state.percent = 0;
+      state.error = (result && result.error) || 'download';
+      return;
+    }
+
     state.percent = 100;
     state.downloading = false;
     state.ready = true;
     state.file = result && result.file ? String(result.file) : '';
     return result;
-  } catch {
+  } catch (err) {
+    console.error('[updates] download failed:', err && (err.code || err.message));
     state.downloading = false;
     state.percent = 0;
     state.error = 'download';
@@ -128,7 +138,12 @@ export async function downloadUpdate() {
 export async function installUpdate() {
   if (!state.ready) return;
   try {
-    return await bridge.updater.install(state.file);
+    const result = await bridge.updater.install(state.file);
+    if (!result || result.ok !== true) {
+      state.error = (result && result.error) || 'install';
+      return result;
+    }
+    return result;
   } catch {
     state.error = 'install';
   }

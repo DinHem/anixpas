@@ -85,7 +85,16 @@
       {/if}
     {/if}
 
-    {#if state.error === 'download'}
+    {#if state.error === 'timeout'}
+      <span class="update-error">
+        Скачивание прервалось: сервер слишком долго не отвечал. Попробуйте ещё раз —
+        докачка начнётся заново.
+      </span>
+    {:else if state.error === 'network'}
+      <span class="update-error">Связь оборвалась во время скачивания. Проверьте соединение.</span>
+    {:else if state.error === 'checksum'}
+      <span class="update-error">Файл скачался с ошибкой — обновление отклонено.</span>
+    {:else if state.error === 'download'}
       <span class="update-error">Не удалось скачать. Проверьте сеть и попробуйте снова.</span>
     {:else if state.error === 'install'}
       <span class="update-error">Не удалось запустить установщик.</span>
