@@ -23,10 +23,17 @@
 
   /** Сколько последних запросов помним. */
   const HISTORY_LIMIT = 8;
+  /** Живой поиск: не раньше третьего символа и с паузой после ввода. */
+  const LIVE_MIN_CHARS = 3;
+  const LIVE_DELAY = 450;
   /** Сколько тайтлов в блоках «Популярное» и «Топ». */
   const DISCOVER_LIMIT = 12;
 
   let query = $state('');
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let liveTimer = null;
+  /** Запрос, который уже искали — чтобы не повторять его же. */
+  let lastQuery = '';
   /** @type {any[]} */
   let results = $state([]);
   /** Вид выдачи: сетка как в каталоге или подробный список. */
@@ -87,6 +94,10 @@
     loading = true;
     error = '';
 
+    // Запоминаем, под какой запрос грузим: если текст успел измениться,
+    // этот ответ уже не нужен.
+    const requested = mode === 'filter' ? '' : query.trim();
+
     try {
       const result = await collectFresh({
         page,
@@ -94,8 +105,10 @@
         fetchPage: (p) =>
           mode === 'filter'
             ? bridge.catalog(p, filters, force && p === page)
-            : bridge.search(query.trim(), p, force && p === page),
+            : bridge.search(requested, p, force && p === page),
       });
+
+      if (mode === 'search' && query.trim() !== requested) return;
 
       if (result.fresh.length > 0) results = [...results, ...result.fresh];
       page = result.page;
@@ -140,12 +153,15 @@
     }
   });
 
-  async function startSearch(value = query) {
+  /** @param {string} [value] @param {{push?: boolean}} [options] */
+  async function startSearch(value = query, options = {}) {
     const text = value.trim();
     if (!text) return;
 
     query = text;
-    pushHistory(text);
+    lastQuery = text;
+    // Живой поиск историю не засоряет: туда попадает только явный запрос.
+    if (options.push !== false) pushHistory(text);
 
     mode = 'search';
     results = [];
@@ -154,6 +170,36 @@
     searched = true;
 
     await load(true);
+  }
+
+  /**
+   * Живой поиск: через 450 мс после последнего символа уходит запрос.
+   * Короче трёх символов не ищем — незачем дёргать API на «на».
+   */
+  function scheduleLiveSearch() {
+    if (liveTimer) clearTimeout(liveTimer);
+
+    const text = query.trim();
+
+    if (text.length < LIVE_MIN_CHARS) {
+      // Стерли до одного-двух символов — возвращаемся к витрине.
+      if (searched && mode === 'search') {
+        searched = false;
+        mode = 'filter';
+        results = [];
+        page = 0;
+        exhausted = false;
+        error = '';
+        lastQuery = '';
+      }
+      return;
+    }
+
+    liveTimer = setTimeout(() => {
+      liveTimer = null;
+      if (text === lastQuery) return;
+      startSearch(text, { push: false });
+    }, LIVE_DELAY);
   }
 
   /** Быстрый подбор по одному жанру — без открытия панели. */
@@ -349,6 +395,7 @@
     bind:this={inputEl}
     placeholder={searched ? 'Название аниме…' : 'Что посмотрим? Например, «Наруто»'}
     bind:value={query}
+    oninput={() => scheduleLiveSearch()}
     onkeydown={(e) => {
       if (e.key === 'Enter') startSearch();
       if (e.key === 'Escape') reset();
